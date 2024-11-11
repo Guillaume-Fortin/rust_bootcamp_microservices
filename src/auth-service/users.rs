@@ -1,8 +1,5 @@
-use pbkdf2::{
-    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Pbkdf2,
-};
-use rand_core::OsRng;
+use bcrypt::{hash, verify, DEFAULT_COST};
+
 use uuid::Uuid;
 
 use std::collections::HashMap;
@@ -33,10 +30,7 @@ impl Users for UsersImpl {
             return Err("Username already exists".to_owned());
         }
 
-        let salt = SaltString::generate(&mut OsRng);
-
-        let hashed_password = Pbkdf2
-            .hash_password(password.as_bytes(), &salt)
+        let hashed_password = hash(password, DEFAULT_COST)
             .map_err(|e| format!("Failed to hash password.\n{e:?}"))?
             .to_string();
 
@@ -59,13 +53,12 @@ impl Users for UsersImpl {
 
         // Get user's password as `PasswordHash` instance.
         let hashed_password = user.password.clone();
-        let parsed_hash = PasswordHash::new(&hashed_password).ok()?;
 
         // Verify passed in password matches user's password.
-        let result = Pbkdf2.verify_password(password.as_bytes(), &parsed_hash);
+        let result = verify(password, &hashed_password).ok()?;
 
         // If the username and password passed in matches the user's username and password return the user's uuid.
-        if user.username == username && result.is_ok() {
+        if user.username == username && result {
             return Some(user.user_uuid.clone());
         }
 

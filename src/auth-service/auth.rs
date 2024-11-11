@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::{sessions::Sessions, users::Users};
 
@@ -19,14 +19,14 @@ pub use authentication::auth_server::AuthServer;
 pub use tonic::transport::Server;
 
 pub struct AuthService {
-    users_service: Box<Mutex<dyn Users + Send + Sync>>,
-    sessions_service: Box<Mutex<dyn Sessions + Send + Sync>>,
+    users_service: Box<RwLock<dyn Users + Send + Sync>>,
+    sessions_service: Box<RwLock<dyn Sessions + Send + Sync>>,
 }
 
 impl AuthService {
     pub fn new(
-        users_service: Box<Mutex<dyn Users + Send + Sync>>,
-        sessions_service: Box<Mutex<dyn Sessions + Send + Sync>>,
+        users_service: Box<RwLock<dyn Users + Send + Sync>>,
+        sessions_service: Box<RwLock<dyn Sessions + Send + Sync>>,
     ) -> Self {
         Self {
             users_service,
@@ -45,11 +45,11 @@ impl Auth for AuthService {
 
         let req = request.into_inner();
 
-        // Get user's uuid from `users_service`. Panic if the lock is poisoned.
+        // Get user's uuid from `users_service`.
         let result: Option<String> = self
             .users_service
-            .lock()
-            .expect("lock should be empoissoned")
+            .read()
+            .await
             .get_user_uuid(req.username, req.password);
 
         // Match on `result`. If `result` is `None` return a SignInResponse with a the `status_code` set to `Failure`
@@ -67,11 +67,11 @@ impl Auth for AuthService {
             }
         };
 
-        // Create new session using `sessions_service`. Panic if the lock is poisoned.
-        let session_token: String = self
+        // Create new session using `sessions_service`.
+        let session_token = self
             .sessions_service
-            .lock()
-            .expect("lock sould be empoissoned")
+            .write()
+            .await
             .create_session(&user_uuid);
 
         // Create a `SignInResponse` with `status_code` set to `Success`
@@ -92,11 +92,11 @@ impl Auth for AuthService {
 
         let req = request.into_inner();
 
-        // Create a new user through `users_service`. Panic if the lock is poisoned.
+        // Create a new user through `users_service`.
         let result: Result<(), String> = self
             .users_service
-            .lock()
-            .expect("lock sould be empoissoned")
+            .write()
+            .await
             .create_user(req.username, req.password);
 
         // Return a `SignUpResponse` with the appropriate `status_code` based on `result`.
@@ -122,8 +122,8 @@ impl Auth for AuthService {
 
         // Delete session using `sessions_service`.
         self.sessions_service
-            .lock()
-            .expect("lock sould be empoissoned")
+            .write()
+            .await
             .delete_session(&req.session_token);
 
         // Create `SignOutResponse` with `status_code` set to `Success`
@@ -143,8 +143,8 @@ mod tests {
 
     #[tokio::test]
     async fn sign_in_should_fail_if_user_not_found() {
-        let users_service = Box::new(Mutex::new(UsersImpl::default()));
-        let sessions_service = Box::new(Mutex::new(SessionsImpl::default()));
+        let users_service = Box::new(RwLock::new(UsersImpl::default()));
+        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -166,8 +166,8 @@ mod tests {
 
         let _ = users_service.create_user("123456".to_owned(), "654321".to_owned());
 
-        let users_service = Box::new(Mutex::new(users_service));
-        let sessions_service = Box::new(Mutex::new(SessionsImpl::default()));
+        let users_service = Box::new(RwLock::new(users_service));
+        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -189,8 +189,8 @@ mod tests {
 
         let _ = users_service.create_user("123456".to_owned(), "654321".to_owned());
 
-        let users_service = Box::new(Mutex::new(users_service));
-        let sessions_service = Box::new(Mutex::new(SessionsImpl::default()));
+        let users_service = Box::new(RwLock::new(users_service));
+        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -212,8 +212,8 @@ mod tests {
 
         let _ = users_service.create_user("123456".to_owned(), "654321".to_owned());
 
-        let users_service = Box::new(Mutex::new(users_service));
-        let sessions_service = Box::new(Mutex::new(SessionsImpl::default()));
+        let users_service = Box::new(RwLock::new(users_service));
+        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -229,8 +229,8 @@ mod tests {
 
     #[tokio::test]
     async fn sign_up_should_succeed() {
-        let users_service = Box::new(Mutex::new(UsersImpl::default()));
-        let sessions_service = Box::new(Mutex::new(SessionsImpl::default()));
+        let users_service = Box::new(RwLock::new(UsersImpl::default()));
+        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -246,8 +246,8 @@ mod tests {
 
     #[tokio::test]
     async fn sign_out_should_succeed() {
-        let users_service = Box::new(Mutex::new(UsersImpl::default()));
-        let sessions_service = Box::new(Mutex::new(SessionsImpl::default()));
+        let users_service = Box::new(RwLock::new(UsersImpl::default()));
+        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
