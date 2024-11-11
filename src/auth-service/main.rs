@@ -2,6 +2,8 @@ mod auth;
 mod sessions;
 mod users;
 
+use std::sync::Arc;
+
 use auth::*;
 use sessions::{Sessions, SessionsImpl};
 use tokio::sync::RwLock;
@@ -15,11 +17,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::0]:50051".parse()?;
 
     // Create user service instance
-    let users_service: Box<RwLock<dyn Users + Send + Sync + 'static>> =
-        Box::new(RwLock::new(UsersImpl::default()));
+    let users_service: Arc<RwLock<dyn Users + Send + Sync + 'static>> =
+        Arc::new(RwLock::new(UsersImpl::default()));
 
-    let sessions_service: Box<RwLock<dyn Sessions + Send + Sync + 'static>> =
-        Box::new(RwLock::new(SessionsImpl::default()));
+    let sessions_service: Arc<RwLock<dyn Sessions + Send + Sync + 'static>> =
+        Arc::new(RwLock::new(SessionsImpl::default()));
 
     let auth_service = AuthService::new(users_service, sessions_service);
 

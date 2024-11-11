@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tokio::sync::RwLock;
 
 use crate::{sessions::Sessions, users::Users};
@@ -19,14 +21,14 @@ pub use authentication::auth_server::AuthServer;
 pub use tonic::transport::Server;
 
 pub struct AuthService {
-    users_service: Box<RwLock<dyn Users + Send + Sync>>,
-    sessions_service: Box<RwLock<dyn Sessions + Send + Sync>>,
+    users_service: Arc<RwLock<dyn Users + Send + Sync>>,
+    sessions_service: Arc<RwLock<dyn Sessions + Send + Sync>>,
 }
 
 impl AuthService {
     pub fn new(
-        users_service: Box<RwLock<dyn Users + Send + Sync>>,
-        sessions_service: Box<RwLock<dyn Sessions + Send + Sync>>,
+        users_service: Arc<RwLock<dyn Users + Send + Sync>>,
+        sessions_service: Arc<RwLock<dyn Sessions + Send + Sync>>,
     ) -> Self {
         Self {
             users_service,
@@ -143,8 +145,8 @@ mod tests {
 
     #[tokio::test]
     async fn sign_in_should_fail_if_user_not_found() {
-        let users_service = Box::new(RwLock::new(UsersImpl::default()));
-        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
+        let users_service = Arc::new(RwLock::new(UsersImpl::default()));
+        let sessions_service = Arc::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -166,8 +168,8 @@ mod tests {
 
         let _ = users_service.create_user("123456".to_owned(), "654321".to_owned());
 
-        let users_service = Box::new(RwLock::new(users_service));
-        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
+        let users_service = Arc::new(RwLock::new(users_service));
+        let sessions_service = Arc::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -189,8 +191,9 @@ mod tests {
 
         let _ = users_service.create_user("123456".to_owned(), "654321".to_owned());
 
-        let users_service = Box::new(RwLock::new(users_service));
-        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
+        let users_service = Arc::new(RwLock::new(users_service));
+        let sessions_service: Arc<RwLock<SessionsImpl>> =
+            Arc::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -212,8 +215,8 @@ mod tests {
 
         let _ = users_service.create_user("123456".to_owned(), "654321".to_owned());
 
-        let users_service = Box::new(RwLock::new(users_service));
-        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
+        let users_service = Arc::new(RwLock::new(users_service));
+        let sessions_service = Arc::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -229,8 +232,8 @@ mod tests {
 
     #[tokio::test]
     async fn sign_up_should_succeed() {
-        let users_service = Box::new(RwLock::new(UsersImpl::default()));
-        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
+        let users_service = Arc::new(RwLock::new(UsersImpl::default()));
+        let sessions_service = Arc::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
@@ -246,8 +249,8 @@ mod tests {
 
     #[tokio::test]
     async fn sign_out_should_succeed() {
-        let users_service = Box::new(RwLock::new(UsersImpl::default()));
-        let sessions_service = Box::new(RwLock::new(SessionsImpl::default()));
+        let users_service = Arc::new(RwLock::new(UsersImpl::default()));
+        let sessions_service = Arc::new(RwLock::new(SessionsImpl::default()));
 
         let auth_service = AuthService::new(users_service, sessions_service);
 
